@@ -1,0 +1,250 @@
+#!/bin/bash
+
+PROGNAME=$(basename $0)
+VERSION="0.1.0"
+Errmsg="[1;31m[error][0m"
+Sccmsg="[1;32m[success][0m"
+Modidate="2021-08-09"
+incmd="$0 $*"
+
+
+# {{{ usage
+read -r -d '' usage <<EOF
+[1;35m### $PROGNAME ver $VERSION ($Modidate) ###[0m
+
+[1;32m[description][0m
+$PROGNAME is a tool for MAG quality refinement, by automatic removal of contigs that are likely 'contamination' of a given MAG.
+The original form of this tool was developed to improve quality of genomes that are reconstructed from a large-scale ocean metagenome collection (Nishimura and Yoshizawa, bioRxiv, 2021).
+The original scripts were here re-organized as an easy-to-use tool, with some additional functions (e.g., user can select categories to filter out).
+This tool is applicable for any kind of prokaryotic genomes (MAGs/SAGs/isolates).
+More functions (e.g., choose thresholds for each category) are planned to develop.
+
+[1;32m[filters][0m
+1. taxonomy filter (remove taxonomically inconsistent contigs, based on taxonomic assignment of CAT/BAT)
+   category for this filter is 'taxonomy'
+2. outlier filter (remove outlier contigs in terms of coverage and tetranucleotide composition)
+   categories for this filter are 'coverage' and 'tetranuc'
+3. mobile element filter (viral contigs detected by virsorter or high sensitive terL gene identification, and circular contigs)
+   categories for this filter are 'virsorter', 'terL', and 'circular'
+
+[1;32m[categories][0m
+1.   taxonomy  - remove taxonomically inconsistent contigs based on CAT/BAT result. See the original publication for datails.
+2-a. coverage  - remove outlier of coverage. If PC1 of PCA analysis is <-2.5 or >2.5, contigs are removed. This category is applied to contigs of <25% of the input genome size.
+2-b. tetranuc  - remove outlier of tetranucleotide composition. If PC1 of PCA analysis is <-2.5 or >2.5, contigs are removed.
+3-a. virsorter - remove predicted viral contigs. This category is applied to >=3kb contigs.
+3-b. terL      - remove predicted viral contigs. This category is applied to <10kb contigs.
+3-c. circular  - remove predicted virus or plasmid. This category is applied to contigs of <25% of the input genome size.
+
+[1;32m[usage][0m
+$ $PROGNAME [options] -q <genome fasta file(s)> -c <configuration file> -o <output dir>
+
+[1;32m[dependencies][0m
+- ruby (ver >= 2.0) 
+- GNU parallel
+
+[1;32m[options][0m
+  (general)
+    -h, --help
+    -v, --version
+
+  (file/directory)
+    -i, --input      [file(s)] (required)  -- genomic fasta file(s)
+                                              Multiple genome files can be specfied with wildcard (e.g., 'dir/*.fa', quote required) or comma separated values (e.g., A.fa,B.fa).
+    -c, --config     [file] (required)     -- configuration file (two columns of space separated values; template: db_config.txt) 
+    -o, --outdir     [path] (required)     -- output directory (should not exist unless '--overwrite' is specified)
+    --fcov           [file]                -- coverage of contigs (the format must be either 'TSV with a header line' or 'output of jgi_summarize_bam_contig_depths') 
+    --category       [str] (default:all)   -- selction of categories to remove contigs
+                                              It must be combination of 'taxonomy', 'coverage', 'tetranuc', 'virsorter', 'terL', 'circular'
+                                              e.g: 'taxonomy,coverage' will remove taxonomically inconsistent contigs and coverage outlier contigs.
+    --overwrite      [bool]                -- overwrite output directory
+
+  (computation)
+    -n, --ncpus      [int] (default: 1)    -- num CPUs to use (for multicore computation, 'parallel' (GNU parallel) need to be available.)
+
+[1;32m[output files][0m
+  result/<name>/contig_table.tsv -- summary of all analysis. Line1: header, Line2: result of input MAG, Line3-: result of contigs
+  result/<name>/refined.fa       -- genomic fasta of decontaminated MAG
+  result/<name>/refined.log      -- simple statistics of decontamination. It is recommended to check the percentage of retained fraction. If the percentage is too small (e.g., <50%), it is better to inspect 'contig_table.tsv' and do manual curation.
+EOF
+# }}} usage
+
+
+# {{{ parse command line
+for OPT in "$@"
+do
+	case "$OPT" in
+		'-h'|'--help' )
+			echo "$usage"
+			exit 1
+			;;
+		'-v'|'--version' )
+			echo $VERSION
+			exit 1
+			;;
+		'-i'|'--input' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2; exit 1
+			fi
+			input="$2"
+			shift 2
+			;;
+		'-c'|'--config' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2; exit 1
+			fi
+			config="$2"
+			shift 2
+			;;
+		'--fcov' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2; exit 1
+			fi
+			fcov="$2"
+			shift 2
+			;;
+		'--category' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2; exit 1
+			fi
+			category="$2"
+			shift 2
+			;;
+		'-o'|'--outdir' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2; exit 1
+			fi
+			outdir="$2"
+			shift 2
+			;;
+		'--overwrite' )
+			overwrite=true
+			shift 1
+			;;
+		'-n'|'--ncpus' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2; exit 1
+			fi
+			ncpus="$2"
+			shift 2
+			;;
+		'--'|'-' )
+			shift 1
+			params+=( "$@" )
+			break
+			;;
+		-*)
+			echo "$Errmsg illegal option -- '$(echo $1 | sed 's/^-*//')'" 1>&2; exit 1
+			;;
+		*)
+			if [[ ! -z "$1" ]] && [[ ! "$1" =~ ^-+ ]] ; then
+				echo "$Errmsg unparsable argument ($1)." 1>&2; echo "        Note: do not forget quotation marks to use wildcards" 1>&2; exit 1
+			fi
+			;;
+	esac
+done
+
+## default
+ncpus="${ncpus:-1}"
+category="${category:-all}"
+
+re='^[0-9]+$'
+if   [[ ! -n "$input" ]] ; then
+	echo "$Errmsg  -i, --input <fasta file(s)> should be given." 1>&2; echo "         execute '$PROGNAME -h' for usage" 1>&2; exit 1
+elif [[ ! -n "$config" ]] ; then
+	echo "$Errmsg  -c, --config <configuration file> should be given." 1>&2; echo "         execute '$PROGNAME -h' for usage" 1>&2; exit 1
+elif [[ ! -n "$outdir" ]] ; then
+	echo "$Errmsg  -o, --outdir should be given." 1>&2; echo "         execute '$PROGNAME -h' for usage" 1>&2; exit 1
+elif [[   -d "$outdir" && -z "$overwrite" ]] ; then
+	echo "$Errmsg  -o, --outdir $outdir already exists. Use --overwrite to overwrite it. " 1>&2; echo "         execute '$PROGNAME -h' for usage" 1>&2; exit 1
+elif [[ ! -d "$outdir" &&  -e "$outdir" ]] ; then
+	echo "$Errmsg  -o, --outdir $outdir already exists and not directory (is it a file?). " 1>&2; echo "         execute '$PROGNAME -h' for usage" 1>&2; exit 1
+elif [[ ! $ncpus =~ $re ]] ; then
+	echo "$Errmsg  --ncpus '$ncpus' is not an integer" 1>&2; echo "         execute '$PROGNAME -h' for usage" 1>&2; exit 1
+fi
+
+if [[ -d "$outdir" && "$overwrite" = "true" ]] ; then
+	outdir_exist=true
+fi
+
+### rakefile/logdir
+pushd `dirname $0` > /dev/null
+scrdir=`pwd -P`
+popd > /dev/null
+jobname=`basename $0`
+rakefile=$scrdir/$jobname.rake
+
+logdir=$outdir/log
+mkdir -p $logdir
+startTime=$(LC_ALL=C date +"%Y-%m-%d_%H:%M:%S")
+flog=$logdir/$startTime.$jobname.log
+# }}} parse command line
+
+
+# {{{ check dependencies
+command -v ruby >/dev/null 2>&1 || { echo >&2 "$Errmsg ruby is not available.  Aborting."; exit 1; }
+
+### check ruby version
+ST=`ruby -e 'print RUBY_VERSION.to_f >= 2.0 ? 0 : 1'`
+if [ $ST -ne 0 ]; then 
+	echo >&2 "$Errmsg ruby (version >=2.0) is required.  Aborting."; exit 1;
+fi
+
+### check availablity of GNU parallel
+# if [ "$ncpus" -gt 1 ]; then 
+command -v parallel >/dev/null 2>&1 || { echo >&2 "$Errmsg parallel (GNU parallel) is not available.  Aborting."; exit 1; }
+# fi
+# }}} check dependencies
+
+
+# {{{ after run function
+function after_run(){
+  endTime=$(LC_ALL=C date +"%Y-%m-%d %H:%M:%S %z")
+
+  if [[ $1 -gt 0 ]] ; then
+    echo "$Errmsg run failed: $endTime" > "$logdir/$startTime.$jobname.error"
+    echo "$Errmsg process is killed: $endTime" |tee -a "$flog"
+    exit 1
+  else
+    echo "$Sccmsg run finished: $endTime" > "$logdir/$startTime.$jobname.success"
+  fi
+}
+### }}} after run function
+
+
+# {{{ input command
+read -r -d '' incmdlog <<EOF
+
+[1;32m===== command line[0m
+
+$ $incmd
+
+[1;32m===== log file[0m
+
+$flog
+
+[1;32m===== check version: $PROGNAME[0m
+
+$VERSION
+
+EOF
+# }}} input command
+
+
+### main
+
+## write input command
+echo "$incmdlog" |tee -a $flog
+
+## trap Ctrl-C etc...
+trap 'after_run 1' 1 2 3 9 15
+
+## run
+rake -f $rakefile \
+	outdir="$outdir" input="$input" config="$config" outdir_exist="$outdir_exist" \
+	fcov="$fcov" \
+	category="$category" \
+	ncpus="$ncpus" \
+	2>&1 |tee -a $flog
+st=$(( ${PIPESTATUS[0]} + ${PIPESTATUS[1]} ))
+after_run $st
+

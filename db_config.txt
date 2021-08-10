@@ -1,0 +1,19 @@
+### [format: space separeted, two column values]
+### Lines can be commented out by "#" at the head
+
+### see also the 'install' section of README.md
+### replace '/path_to_dir' below to fit your environment
+
+## (A) hhsuite_pfam_db
+## for example, download http://wwwuser.gwdg.de/~compbiol/data/hhsuite/databases/hhsuite_dbs/pfamA_32.0.tar.gz
+## uncompress by `tar xvf /path_to_dir/pfamA_32.0.tar.gz` --> generate 7 files: /path_to_dir/pfam{_a3m.ffindex,_a3m.ffdata,_hhm.ffindex,_hhm.ffdata,_cs219.ffindex,_cs219.ffdata,.md5sum}
+hhsuite_pfam_db_prefix /path_to_dir/pfam  
+
+## (B) CAT/BAT database
+## cat_bat_nr_db: directory of NR
+cat_bat_nr_db /path_to_dir/CAT_database
+## cat_bat_tx_db: directory of NCBI taxonomy
+cat_bat_tx_db /path_to_dir/CAT_taxonomy
+
+## (C) virsorter data
+virsorter_data /path_to_dir/virsorter-data

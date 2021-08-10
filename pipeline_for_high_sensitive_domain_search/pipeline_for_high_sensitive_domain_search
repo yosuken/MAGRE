@@ -1,0 +1,353 @@
+#!/bin/bash
+
+PROGNAME=$(basename $0)
+VERSION="0.1.3"
+Errmsg="[1;31m[error][0m"
+Sccmsg="[1;32m[success][0m"
+Modidate="2019-07-29"
+incmd="$0 $*"
+numWord=$(echo $incmd |wc -w)
+
+
+# {{{ usage
+read -r -d '' usage <<EOF
+[1;35m### $PROGNAME ver $VERSION ($Modidate) ###[0m
+
+[32m[description][0m
+$PROGNAME - a helper tool for high sensitive HMM-HMM search against Pfam using HHsearch and JackHMMER
+
+[32m[reference][0m
+HHsearch  - doi:10.1093/bioinformatics/bti125
+JackHMMER - doi:10.1186/1471-2105-11-431
+
+[32m[usage][0m
+$ $PROGNAME [options]
+
+[32m[dependencies][0m
+    - jackhmmer             -- included in the HMMER3 package;
+                               http://hmmer.org/
+    - hhsearch, reformat.pl -- included in the HHsuite package;
+                               HHsuite3 - https://github.com/soedinglab/hh-suite
+                               HHsuite2 - http://wwwuser.gwdg.de/~compbiol/data/hhsuite/releases/all/
+    - ruby (ver >=2.1) 
+
+[32m[options][0m
+  (general)
+    -i, --in      [path]  (required) query protein fasta file. To use multiple files as input, this value could be (1) comma-separeted file paths or (2) path of input file list (one file in one line).
+                          If many proteins are included in a fasta file, adding "belongTo:" tag in comment lines to generate easy-to-understand output.  e.g. ">protein1 len:200 belongTo:contig1"
+    -o, --out     [path]  (required) output directory. It should not exist.
+    -J, --jackdb  [path]  (required) protein fasta file to create query HMM with query proteins, used as database sequences for JackHMMER
+    -H, --hhdb    [path]  (required) Pfam database for HHsearch available here: http://wwwuser.gwdg.de/~compbiol/data/hhsuite/databases/hhsuite_dbs/
+    -h, --help
+    -v, --version
+
+  (jackhmmer related)
+    -N, --iter    [int]   (default: 5) number of iteration of JackHMMER serach
+        --incE    [num]   (default: 0.001) inclusion threshold for sequences
+        --incdomE [num]   (default: 0.001) inclusion threshold for domains
+
+  (hhsearch related)
+    -n, --nreport [int]   (default: 3)  number of hits for each query shown in a result table
+        --evalue  [num]   (default: 10) E-value threshold for inclusion in a result table
+        --pvalue  [num]   (default: 1)  P-value threshold for inclusion in a result table
+        --prob    [num]   (default: 30) %-Probability threshold for inclusion in a result table
+
+  (use GNU parallel)
+        --ncpus   [int]   -- number of simaltaneous jobs
+
+  (for icr user)          for computation in the ICR supercomputer system
+        --queue   [JP1]   -- queue to calculate
+
+[32m[output files][0m
+result/<input file name>/<group>/besthit.tsv   -- table of HHserach besthit. See README.md for column description. Group is what is specified by the "belongTo:" tags or "ungrouped" if not provided (see description of the -i/--in option).
+result/<input file name>/<group>/top<n>hit.tsv -- table of HHserach top<n>hit. <n> can be altered by -n/--nreport option (default: 3).
+work/<input file name>/<group>/<protein>/      -- The directory includes all the output files of jackhmmer and hhsearch
+info/stats.txt                                 -- number of proteins in each file
+EOF
+# }}} usage
+
+
+# {{{ parse command line
+for OPT in "$@"
+do
+	case "$OPT" in
+		'-h'|'--help' )
+			echo "$usage"
+			exit 1
+			;;
+		'-v'|'--version' )
+			echo $VERSION
+			exit 1
+			;;
+		'--overwrite' )
+			overwrite=true
+			shift 1
+			;;
+		'-i'|'--in' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			in="$2"
+			shift 2
+			;;
+		'-o'|'--out' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			dir="$2"
+			shift 2
+			;;
+		'-J'|'--jackdb' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			jackdb="$2"
+			shift 2
+			;;
+		'-H'|'--hhdb' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			hhdb="$2"
+			shift 2
+			;;
+		'-N'|'--iter' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			iter="$2"
+			shift 2
+			;;
+		'--incE' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			incE="$2"
+			shift 2
+			;;
+		'--incdomE' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			incdomE="$2"
+			shift 2
+			;;
+		'--evalue' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			evalue="$2"
+			shift 2
+			;;
+		'--pvalue' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			pvalue="$2"
+			shift 2
+			;;
+		'--prob' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			prob="$2"
+			shift 2
+			;;
+		'-n'|'--nreport' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			nreport="$2"
+			shift 2
+			;;
+		'--queue' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			queue="$2"
+			shift 2
+			;;
+		'--ncpus' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			ncpus="$2"
+			shift 2
+			;;
+		'--wtime' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			wtime="$2"
+			shift 2
+			;;
+		'--'|'-' )
+			shift 1
+			params+=( "$@" )
+			break
+			;;
+		-*)
+			echo "$Errmsg illegal option -- '$(echo $1 | sed 's/^-*//')'" 1>&2
+			exit 1
+			;;
+		*)
+			if [[ ! -z "$1" ]] && [[ ! "$1" =~ ^-+ ]] ; then
+				params+=( "$1" )
+				shift 1
+			fi
+			;;
+	esac
+done
+# }}} parse command line
+
+
+# {{{ validate input command/arguments
+if [ $numWord -eq 1 ] ; then ## case when no argument is given.
+	echo "$usage"
+	exit 1
+elif [[ ! -n "$dir" ]] ; then
+	echo "$Errmsg  -o, --out should be given." 1>&2; echo "         execute '$PROGNAME -h' for usage" 1>&2; exit 1
+elif [[   -d "$dir" && -z "$overwrite" ]] ; then
+	echo "$Errmsg  -o, --out $dir already exists. Use --overwrite to overwrite it. " 1>&2; echo "         execute '$PROGNAME -h' for usage" 1>&2; exit 1
+elif [ -n "$params" ] ; then
+	echo "$Errmsg some argument detected. Need no argument." 1>&2
+	exit 1
+elif [ -z "$in" ] ; then
+	echo "$Errmsg query protein sequence should be specified ('-i' or '--in')" 1>&2
+	exit 1
+elif [ -z "$jackdb" ] ; then
+	echo "$Errmsg protein fasta file for jackhmmer database should be specified ('-J' or '--jackdb')" 1>&2
+	exit 1
+elif [ ! -f "$jackdb" ] ; then
+	echo "$Errmsg protein fasta file for jackhmmer database should exist" 1>&2
+	exit 1
+elif [ -z "$hhdb" ] ; then
+	echo "$Errmsg database file for hhsearch should be specified ('-H' or '--hhdb')" 1>&2
+	exit 1
+# elif [ ! -f "${hhdb}_hhm_db" ] ; then
+# 	echo "$Errmsg ${hhdb}_hhm.db should exist" 1>&2
+# 	exit 1
+elif [ ! -f "${hhdb}_hhm.ffdata" ] ; then
+	echo "$Errmsg ${hhdb}_hhm.ffdata should exist" 1>&2
+	exit 1
+elif [ "$nreport" -lt 1 ] ; then
+	echo "$Errmsg $nreport should be equal to or more than 1." 1>&2
+	exit 1
+elif ! [ -f "$in" ] ; then ## input file is not detected --> validate comma separated multiple files
+	for f in $(echo $in | tr "," "\n") ; do
+		if ! [ -f "$f" ] ; then
+			echo "$Errmsg \"$f\" does not exist." 1>&2
+			exit 1
+		fi
+	done
+fi
+# }}} validate input command
+
+
+# {{{ check dependencies
+### check availablity of commands of HMMER3/HHsuite
+command -v jackhmmer   >/dev/null 2>&1 || { echo >&2 "$Errmsg jackhmmer (in HMMER3 package) is required but not available.  Aborting."; exit 1; }
+command -v hhsearch    >/dev/null 2>&1 || { echo >&2 "$Errmsg hhsearch (in HHsuite package) is required but not available.  Aborting."; exit 1; }
+command -v reformat.pl >/dev/null 2>&1 || { echo >&2 "$Errmsg reformat.pl (in HHsuite package) is required but not available.  Aborting."; exit 1; }
+
+### check ruby version
+ST=`ruby -e 'print RUBY_VERSION.to_f >= 2.1 ? 0 : 1'`
+if [ $ST -ne 0 ]; then 
+	echo >&2 "$Errmsg ruby (version >=2.1) is required.  Aborting."; exit 1;
+fi
+
+### check availablity of GNU parallel
+if [ -n $ncpus ]; then 
+	command -v parallel >/dev/null 2>&1 || { echo >&2 "$Errmsg GNU parallel is required but not available.  Aborting."; exit 1; }
+fi
+# }}} check dependencies
+
+
+# {{{ assign variables 
+### parse args
+
+### param for split length for fast up
+iter="${iter:-5}"
+
+### thresholds (jackhmmer)
+incE="${incE:-0.001}"
+incdomE="${incdomE:-0.001}"
+
+### thresholds (hhsearch)
+nreport="${nreport:-3}"
+## [ref: hhsuite-userguide.pdf] Roughly speaking, one should give a hit serious consideration (i.e., check the other points in this list) whenever (1) the hit has > 50% probability, or (2) it has > 30% probability and is among the top three hits.
+evalue="${evalue:-10}"
+pvalue="${pvalue:-1}"
+prob="${prob:-30}"
+
+### computation params
+queue="${queue}"
+nthread="${nthread:-1}"
+wtime="${wtime:-24:00:00}"
+
+### rakefile/logdir
+pushd `dirname $0` > /dev/null
+scrdir=`pwd -P`
+popd > /dev/null
+jobname=`basename $0`
+rakefile=$scrdir/$jobname.rake
+logdir=$dir/log
+# }}} assign variables 
+
+
+# {{{ after run function
+function after_run(){
+  endTime=$(LC_ALL=C date +"%Y-%m-%d %H:%M:%S %z")
+
+  if [[ $1 -gt 0 ]] ; then
+    echo "$Errmsg run failed: $endTime" > "$logdir/$startTime.$jobname.error"
+    echo "$Errmsg process is killed: $endTime" |tee -a "$logdir/$jobname.log"
+    exit 1
+  else
+    echo "$Sccmsg run finished: $endTime" > "$logdir/$startTime.$jobname.success"
+  fi
+}
+### }}} after run function
+
+
+# {{{ input command
+read -r -d '' incmdlog <<EOF
+
+[1;32m===== command line[0m
+
+$ $incmd
+
+EOF
+# }}} input command
+
+
+### main
+mkdir -p $logdir
+startTime=$(LC_ALL=C date +"%Y-%m-%d %H:%M:%S")
+
+## write input command
+echo "$incmdlog" |tee -a $logdir/$jobname.log
+
+## trap Ctrl-C etc...
+trap 'after_run 1' 1 2 3 9 15
+
+## run
+rake -f $rakefile dir="$dir" in="$in" jackdb="$jackdb" hhdb="$hhdb" iter="$iter" incE="$incE" incdomE="$incdomE" nreport="$nreport" \
+	evalue="$evalue" pvalue="$pvalue" prob="$prob" queue="$queue" ncpus="$ncpus" wtime="$wtime" 2>&1 |tee -a $logdir/$jobname.log
+st=$(( ${PIPESTATUS[0]} + ${PIPESTATUS[1]} ))
+after_run $st
+

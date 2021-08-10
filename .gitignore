@@ -1,0 +1,19 @@
+### bundle related files
+# /vendor/*
+# /.bundle/*
+# Gemfile.lock
+
+### file cache
+*.swp
+*~
+.nfs*
+
+### "old" directory
+/old
+
+### my.xxx setting file
+/my.*
+### pbslog
+/pbslog
+### test output directory
+/test*
