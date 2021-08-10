@@ -4,7 +4,7 @@ PROGNAME=$(basename $0)
 VERSION="0.1.0"
 Errmsg="[1;31m[error][0m"
 Sccmsg="[1;32m[success][0m"
-Modidate="2021-08-09"
+Modidate="2021-08-11"
 incmd="$0 $*"
 
 
@@ -38,10 +38,6 @@ More functions (e.g., choose thresholds for each category) are planned to develo
 [1;32m[usage][0m
 $ $PROGNAME [options] -q <genome fasta file(s)> -c <configuration file> -o <output dir>
 
-[1;32m[dependencies][0m
-- ruby (ver >= 2.0) 
-- GNU parallel
-
 [1;32m[options][0m
   (general)
     -h, --help
@@ -59,10 +55,10 @@ $ $PROGNAME [options] -q <genome fasta file(s)> -c <configuration file> -o <outp
     --overwrite      [bool]                -- overwrite output directory
 
   (computation)
-    -n, --ncpus      [int] (default: 1)    -- num CPUs to use (for multicore computation, 'parallel' (GNU parallel) need to be available.)
+    -n, --ncpus      [int] (default: 4)    -- the number of CPUs used for calculation
 
 [1;32m[output files][0m
-  result/<name>/contig_table.tsv -- summary of all analysis. Line1: header, Line2: result of input MAG, Line3-: result of contigs
+  result/<name>/contig_table.tsv -- result of all analysis. Line 1: header. Line 2: result of input MAG. Line 3-: result of contigs.
   result/<name>/refined.fa       -- genomic fasta of decontaminated MAG
   result/<name>/refined.log      -- simple statistics of decontamination. It is recommended to check the percentage of retained fraction. If the percentage is too small (e.g., <50%), it is better to inspect 'contig_table.tsv' and do manual curation.
 EOF
@@ -144,7 +140,7 @@ do
 done
 
 ## default
-ncpus="${ncpus:-1}"
+ncpus="${ncpus:-4}"
 category="${category:-all}"
 
 re='^[0-9]+$'

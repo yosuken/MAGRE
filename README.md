@@ -10,54 +10,70 @@ The original form of this tool was developed for quality improvement of a large-
 Later, the original scripts were organized as an easy-to-use tool, extended with some additional function (e.g., user can select categories of filter out condition).
 For details, see original publication (Nishimura and Yoshizawa, bioRxiv, 2021)
 
-## install
+## install (use conda environment)
+
+### [1] make conda environment and install packages
 ```
-### Use conda environment
-
-## [1] make conda environment and install packages
 $ conda create -n MAGRE -y && conda activate MAGRE
+```
 
-## [2] install packages: other versions can be used, but virsorter should be v1.0.6
+### [2] install packages: other versions can be used, but virsorter should be v1.0.6
+```
 $ conda install -y -c conda-forge r-base=4.1.0 ruby=2.7.2 parallel=20210622
 $ conda install -y -c bioconda virsorter=1.0.6 prodigal=2.6.3 hhsuite=3.3.0 cat=5.0.3 blast=2.12.0
 $ conda install -y -c biobuilds fasta=36.3.8e
+```
 
-## [3] make copy reformat.pl (in hhsuite) to bin directory
-## File path (i.e. ~/miniconda) should be modified to fit your environment.
+### [3] make copy reformat.pl (in hhsuite) to bin directory
+- File path (i.e. ~/miniconda) should be modified to fit your environment.
+```
 $ cp ~/miniconda/envs/MAGRE/scripts/reformat.pl ~/miniconda/envs/MAGRE/bin
+```
 
-## [4] download virsorter data (reference: https://github.com/simroux/VirSorter)
-## First, move to a directory to put virsorter data
+### [4] download virsorter data (reference: https://github.com/simroux/VirSorter)
+- First, move to a directory to put virsorter data
+```
 $ wget https://zenodo.org/record/1168727/files/virsorter-data-v2.tar.gz
 $ md5sum virsorter-data-v2.tar.gz # md5sum should return dd12af7d13da0a85df0a9106e9346b45
 $ tar -xvzf virsorter-data-v2.tar.gz # --> generate 'virsorter-data' directory
+```
 
-## [5] download pfam hhsuite db (reference: https://github.com/soedinglab/hh-suite)
-## First, move to a directory to put hhsuite db
-## download pfamA db (e.g., pfamA_32.0.tar.gz) from http://wwwuser.gwdg.de/~compbiol/data/hhsuite/databases/hhsuite_dbs
+### [5] download pfam hhsuite db (reference: https://github.com/soedinglab/hh-suite)
+- First, move to a directory to put hhsuite db
+- download pfamA db (e.g., pfamA_32.0.tar.gz) from http://wwwuser.gwdg.de/~compbiol/data/hhsuite/databases/hhsuite_dbs
+```
 $ wget http://wwwuser.gwdg.de/~compbiol/data/hhsuite/databases/hhsuite_dbs/pfamA_32.0.tar.gz
 $ tar xvf pfamA_32.0.tar.gz # --> generate 7 files: ./pfam{_a3m.ffindex,_a3m.ffdata,_hhm.ffindex,_hhm.ffdata,_cs219.ffindex,_cs219.ffdata,.md5sum}
+```
 
-## [6] set up CAT/BAT database (reference: https://github.com/dutilh/CAT)
-## First, move to a directory to put CAT database
+### [6] set up CAT/BAT database (reference: https://github.com/dutilh/CAT)
+- First, move to a directory to put CAT database
+```
 $ CAT prepare --help
 $ CAT prepare --fresh -d CAT_database/ -t CAT_taxonomy/
+```
 
-## Note: diamond v0.9.14 will be installed to the environment, due to specification of virsorter=1.0.6.
-## When the execution, CAT will use this version of diamond. Please confirm to use the same version of diamond that builds a CAT database. (see https://github.com/dutilh/CAT)
-## If you have already built a database with a different verion of diamond, a possible solution could be overwriting the diamond binary within conda environment (see followings).
-## A straight-ahead solution like 'conda install diamond=x.x.x' will be failed because of conflict of dependencies.
-## Alternatively, a bolder approach can be taken as workaround. Here, suppose you need diamond v0.9.29.
-## File path below (i.e. ~/miniconda) should be modified to fit your environment.
+### be careful for diamond version
+diamond v0.9.14 will be installed to the environment, due to specification of virsorter=1.0.6.
+When the execution, CAT will use this version of diamond.
+Please confirm to use the same version of diamond that builds a CAT database. (see https://github.com/dutilh/CAT)
+If you have already built a database with a different verion of diamond,
+a possible solution could be overwriting the diamond binary within conda environment (see followings).
+A straight-ahead solution like 'conda install diamond=x.x.x' will be failed because of conflict of dependencies.
+Alternatively, a bolder approach can be taken as workaround. Here, suppose you need diamond v0.9.29.
+File path below (i.e. ~/miniconda) should be modified to fit your environment.
+```
 $ conda create -n diamond_v0.9.29 -y && conda activate diamond_v0.9.29 && conda install -y -c bioconda diamond=0.9.29
-$ cp ~/miniconda/envs/MAGRE/bin/diamond ~/miniconda/envs/MAGRE/bin/diamond.original ## make backup
-$ cp ~/miniconda/envs/diamond_v0.9.29/bin/diamond ~/miniconda/envs/MAGRE/bin/diamond     ## replace
+$ cp ~/miniconda/envs/MAGRE/bin/diamond ~/miniconda/envs/MAGRE/bin/diamond.original   ## make backup
+$ cp ~/miniconda/envs/diamond_v0.9.29/bin/diamond ~/miniconda/envs/MAGRE/bin/diamond  ## replace
+```
 
-## [7] modify db_config.txt
-## edit 4 file paths of databases
+### [7] modify db_config.txt
+- edit 4 file paths of databases
 
-## [8] test run
-## Double quatation (") is needed to use '*' as wildcard for specifying input files.
+### [8] test run
+- Double quatation (") is needed to use * as a wildcard for specifying input files.
+```
 $ ./MAGRE -n 12 -i "data/testdata/*.fa" -c db_config.txt -o test_out --fcov data/testdata/depth_in_jgi_format.txt --overwrite
 ```
 
@@ -104,10 +120,6 @@ More functions (e.g., choose thresholds for each category) are planned to develo
 [usage]
 $ MAGRE [options] -q <genome fasta file(s)> -c <configuration file> -o <output dir>
 
-[dependencies]
-- ruby (ver >= 2.0)
-- GNU parallel
-
 [options]
   (general)
     -h, --help
@@ -128,7 +140,7 @@ $ MAGRE [options] -q <genome fasta file(s)> -c <configuration file> -o <output d
     -n, --ncpus      [int] (default: 1)    -- num CPUs to use (for multicore computation, 'parallel' (GNU parallel) need to be available.)
 
 [output files]
-  result/<name>/contig_table.tsv -- summary of all analysis. Line1: header, Line2: result of input MAG, Line3-: result of contigs.
+  result/<name>/contig_table.tsv -- result of all analysis. Line 1: header, Line 2: result of input MAG, Line 3-: result of contigs.
   result/<name>/refined.fa       -- genomic fasta of decontaminated MAG
   result/<name>/refined.log      -- simple statistics of decontamination. It is recommended to check the percentage of retained fraction. If the percentage is too small (e.g., <50%), it is better to inspect 'contig_table.tsv' and do manual curation.
 ```
