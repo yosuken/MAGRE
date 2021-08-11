@@ -53,7 +53,7 @@ $ CAT prepare --help
 $ CAT prepare --fresh -d CAT_database/ -t CAT_taxonomy/
 ```
 
-### be careful for diamond version
+### Be careful for diamond version
 diamond v0.9.14 will be installed to the environment, due to specification of virsorter=1.0.6.
 When the execution, CAT will use this version of diamond.
 Please confirm to use the same version of diamond that builds a CAT database. (see https://github.com/dutilh/CAT)
@@ -92,7 +92,7 @@ $ ./MAGRE -n 12 -i "data/testdata/*.fa" -c db_config.txt -o test_out --fcov data
 
 ## usage 
 ```
-### MAGRE ver 0.1.0 (2021-08-09) ###
+### MAGRE ver 0.1.0 (2021-08-11) ###
 
 [description]
 MAGRE is a tool for MAG quality refinement, by automatic removal of contigs that are likely 'contamination' of a given MAG.
@@ -137,10 +137,10 @@ $ MAGRE [options] -q <genome fasta file(s)> -c <configuration file> -o <output d
     --overwrite      [bool]                -- overwrite output directory
 
   (computation)
-    -n, --ncpus      [int] (default: 1)    -- num CPUs to use (for multicore computation, 'parallel' (GNU parallel) need to be available.)
+    -n, --ncpus      [int] (default: 4)    -- the number of CPUs used for calculation
 
 [output files]
-  result/<name>/contig_table.tsv -- result of all analysis. Line 1: header, Line 2: result of input MAG, Line 3-: result of contigs.
+  result/<name>/contig_table.tsv -- result of all analysis. Line 1: header. Line 2: result of input MAG. Line 3-: result of contigs.
   result/<name>/refined.fa       -- genomic fasta of decontaminated MAG
   result/<name>/refined.log      -- simple statistics of decontamination. It is recommended to check the percentage of retained fraction. If the percentage is too small (e.g., <50%), it is better to inspect 'contig_table.tsv' and do manual curation.
 ```
