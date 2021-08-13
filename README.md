@@ -5,7 +5,7 @@
 [![size](https://img.shields.io/github/size/webcaetano/craft/build/phaser-craft.min.js.svg)]()
 
 MAGRE is a tool for quality refinement of prokaryotic MAGs by removing contigs that are likely 'contamination' of the MAG.
-Decontamination is performed based on three independent filters (six categories) without depending on single-copy marker genes.
+Decontamination is performed based on three types of filters (these could be divided into six categories), without depending on single-copy marker genes.
 The original form of this tool was developed for quality improvement of a large-scale ocean MAG collection (Nishimura and Yoshizawa, bioRxiv, 2021).
 Later, the original scripts were organized as an easy-to-use tool, extended with some additional function (e.g., user can select categories of filter out condition).
 For details, see original publication (Nishimura and Yoshizawa, bioRxiv, 2021)
@@ -90,6 +90,22 @@ $ ./MAGRE -n 12 -i "data/testdata/*.fa" -c db_config.txt -o test_out --fcov data
 - ccfind      (bundled in this package. https://github.com/yosuken/ccfind)
 - pipeline_for_high_sensitive_domain_search  (bundled in this package. https://github.com/yosuken/pipeline_for_high_sensitive_domain_search)
 
+## available filters and categories
+Currently, three filters and coresponding six categories were implemented. Users can choose categories used to remove contigs.
+For details of each category, see the publication (Nishimura and Yoshizawa, bioRxiv, 2021)
+1. taxonomy filter (remove taxonomically inconsistent contigs, based on taxonomic assignment of CAT/BAT)
+   category
+   taxonomy: remove taxonomically inconsistent contigs based on CAT/BAT result. See the original publication for datails.
+2. outlier filter (remove outlier contigs in terms of coverage and tetranucleotide composition)
+   categories
+   - coverage: remove outlier of coverage. If PC1 of PCA analysis is <-2.5 or >2.5, contigs are removed. This category is applied to contigs of <25% of the input genome size.
+   - tetranuc: remove outlier of tetranucleotide composition. If PC1 of PCA analysis is <-2.5 or >2.5, contigs are removed.
+3. mobile element filter (viral contigs detected by virsorter or high sensitive terL gene identification, and circular contigs)
+   categories
+   - virsorter: remove predicted viral contigs based on virsorter result. This category is applied to >=3kb contigs. 
+   - terL: remove predicted viral contigs based on the terL gene detection through pipeline_for_high_sensitive_domain_search. This category is applied to <10kb contigs.
+   - circular: remove predicted virus or plasmid based on the circular contig detection through ccfind. This category is applied to contigs of <25% of the input genome size.
+
 ## usage 
 ```
 ### MAGRE ver 0.1.0 (2021-08-11) ###
@@ -158,5 +174,6 @@ $ MAGRE [options] -q <genome fasta file(s)> -c <configuration file> -o <output d
 
 ## note
 - To the given CAT_taxonomy database, subdirectory 'MAGRE' and 'parsed2.txt' within the directory will be created on the first run of MAGRE.
+- In the original publication (Nishimura and Yoshizawa, bioRxiv, 2021), pre-screening was performed for the 'terL' category using HMMs built from proteins of aquatic (mainly marine) viral MAGs (EVGs). However, for generalization of the tool (considering the other environments, such as human gut), this pre-screening is not implemented. All genes of the given MAGs were searched for terL using pipeline_for_high_sensitive_domain_search.
 - If removal of 'circular' contigs is activated (default setting), large circular contigs are removed even if the contig represents a whole chromosome. I am planing to make a new function to set a length threshold (or some other constraint) on removal of circular contigs. As a workaround, it is recommended to check the percentage of retained fraction. If the percentage is too small (e.g., <50%), it is better to inspect 'contig_table.tsv' and do manual curation.
 - If removal of 'coverage' and/or 'tetranuc' categories is activated (default setting), large contigs are removed in some cases. For example, suppose a MAG contains a few long contigs (>10kb; possibly derived from organism A) and multiple short contigs (<1kb; possibly derived from organism B). If the number of the short contigs are larger than that of the long contigs, PCA analysis will regard the long contigs as outlier. I am planning to manipulate such a case, but currently it is recommended to check the percentage of retained fraction and better to inspect 'contig_table.tsv' and do manual curation.
