@@ -90,7 +90,7 @@ $ ./MAGRE -n 12 -i "data/testdata/*.fa" -c db_config.txt -o test_out --fcov data
 - ccfind      (bundled in this package. https://github.com/yosuken/ccfind)
 - pipeline_for_high_sensitive_domain_search  (bundled in this package. https://github.com/yosuken/pipeline_for_high_sensitive_domain_search)
 
-## available filters and categories
+## filters and categories
 Currently, three filters and coresponding six categories are available. Users can choose categories used to remove contigs.
 For details of each category, see the publication (Nishimura and Yoshizawa, bioRxiv, 2021)
 
