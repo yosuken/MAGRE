@@ -91,18 +91,18 @@ $ ./MAGRE -n 12 -i "data/testdata/*.fa" -c db_config.txt -o test_out --fcov data
 - pipeline_for_high_sensitive_domain_search  (bundled in this package. https://github.com/yosuken/pipeline_for_high_sensitive_domain_search)
 
 ## available filters and categories
-Currently, three filters and coresponding six categories were implemented. Users can choose categories used to remove contigs.
+Currently, three filters and coresponding six categories are available. Users can choose categories used to remove contigs.
 For details of each category, see the publication (Nishimura and Yoshizawa, bioRxiv, 2021)
 
 - taxonomy filter (remove taxonomically inconsistent contigs, based on taxonomic assignment of CAT/BAT)
   - taxonomy: remove taxonomically inconsistent contigs based on CAT/BAT result. See the original publication for datails.
 - outlier filter (remove outlier contigs in terms of coverage and tetranucleotide composition)
-  - coverage: remove outlier of coverage. If PC1 of PCA analysis is <-2.5 or >2.5, contigs are removed. This category is applied to contigs of <25% of the input genome size.
+  - coverage: remove outlier of coverage. If PC1 of PCA analysis is <-2.5 or >2.5, contigs are removed.
   - tetranuc: remove outlier of tetranucleotide composition. If PC1 of PCA analysis is <-2.5 or >2.5, contigs are removed.
 - mobile element filter (viral contigs detected by virsorter or high sensitive terL gene identification, and circular contigs)
   - virsorter: remove predicted viral contigs based on virsorter result. This category is applied to >=3kb contigs. 
   - terL: remove predicted viral contigs based on the terL gene detection through pipeline_for_high_sensitive_domain_search. This category is applied to <10kb contigs.
-  - circular: remove predicted virus or plasmid based on the circular contig detection through ccfind. This category is applied to contigs of <25% of the input genome size.
+  - circular: remove predicted virus or plasmid based on the circular contig detection through ccfind.
 
 ## usage 
 ```
@@ -125,11 +125,11 @@ More functions (e.g., choose thresholds for each category) are planned to develo
 
 [categories]
 1.   taxonomy  - remove taxonomically inconsistent contigs based on CAT/BAT result. See the original publication for datails.
-2-a. coverage  - remove outlier of coverage. If PC1 of PCA analysis is <-2.5 or >2.5, contigs are removed. This category is applied to contigs of <25% of the input genome size.
+2-a. coverage  - remove outlier of coverage. If PC1 of PCA analysis is <-2.5 or >2.5, contigs are removed.
 2-b. tetranuc  - remove outlier of tetranucleotide composition. If PC1 of PCA analysis is <-2.5 or >2.5, contigs are removed.
 3-a. virsorter - remove predicted viral contigs. This category is applied to >=3kb contigs.
 3-b. terL      - remove predicted viral contigs. This category is applied to <10kb contigs.
-3-c. circular  - remove predicted virus or plasmid. This category is applied to contigs of <25% of the input genome size.
+3-c. circular  - remove predicted virus or plasmid.
 
 [usage]
 $ MAGRE [options] -q <genome fasta file(s)> -c <configuration file> -o <output dir>
