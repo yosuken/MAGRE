@@ -106,7 +106,7 @@ For details of each category, see the publication (Nishimura and Yoshizawa, bioR
 
 ## usage 
 ```
-### MAGRE ver 0.1.0 (2021-08-11) ###
+### MAGRE ver 0.1.0 (2021-08-13) ###
 
 [description]
 MAGRE is a tool for MAG quality refinement, by automatic removal of contigs that are likely 'contamination' of a given MAG.
@@ -124,12 +124,13 @@ More functions (e.g., choose thresholds for each category) are planned to develo
    categories for this filter are 'virsorter', 'terL', and 'circular'
 
 [categories]
-1.   taxonomy  - remove taxonomically inconsistent contigs based on CAT/BAT result. See the original publication for datails.
+See the original publication for datails.
+1.   taxonomy  - remove taxonomically inconsistent contigs based on CAT/BAT result.
 2-a. coverage  - remove outlier of coverage. If PC1 of PCA analysis is <-2.5 or >2.5, contigs are removed.
 2-b. tetranuc  - remove outlier of tetranucleotide composition. If PC1 of PCA analysis is <-2.5 or >2.5, contigs are removed.
-3-a. virsorter - remove predicted viral contigs. This category is applied to >=3kb contigs.
-3-b. terL      - remove predicted viral contigs. This category is applied to <10kb contigs.
-3-c. circular  - remove predicted virus or plasmid.
+3-a. virsorter - remove predicted viral contigs based on virsorter result. This category is applied to >=3kb contigs.
+3-b. terL      - remove predicted viral contigs based on the terL gene detection through pipeline_for_high_sensitive_domain_search. This category is applied to <10kb contigs.
+3-c. circular  - remove predicted virus or plasmid based on the circular contig detection through ccfind.
 
 [usage]
 $ MAGRE [options] -q <genome fasta file(s)> -c <configuration file> -o <output dir>
