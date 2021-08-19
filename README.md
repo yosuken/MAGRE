@@ -106,7 +106,7 @@ For details of each category, see the publication (Nishimura and Yoshizawa, bioR
 
 ## usage 
 ```
-### MAGRE ver 0.1.0 (2021-08-13) ###
+### MAGRE ver 0.1.1 (2021-08-19) ###
 
 [description]
 MAGRE is a tool for MAG quality refinement, by automatic removal of contigs that are likely 'contamination' of a given MAG.
