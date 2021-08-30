@@ -1,14 +1,13 @@
 
 require 'rake'
-fctg, pdir, codons, *excess = ARGV
+Fctg, Pdir, codons, *excess = ARGV
 raise("argument is not enough") unless codons
 raise("argument is too much") if excess.size > 0
 
-bin  = File.basename(pdir)
+bin  = File.basename(Pdir)
 codons = codons.split(",") ## [!!!] codons should be "4,11"
-fout = "#{pdir}/stats.txt"
-fgffs = []; codons.each{ |codon| fgffs << "#{pdir}/table#{codon}/cds.gff" }
-_pdir = pdir.gsub(%r{/prodigal/}, "/prodigal10k/") ## prodigal result for le10kb contigs
+fout = "#{Pdir}/stats.txt"
+fgffs = []; codons.each{ |codon| fgffs << "#{Pdir}/table#{codon}/cds.gff" }
 
 def parse_coding_len(fgff)
   c_len = 0
@@ -21,12 +20,59 @@ def parse_coding_len(fgff)
   }
   return c_len
 end
+def make_prodigal10k()
+  figff = "#{Pdir}/selected/cds.gff"
+  fifaa = "#{Pdir}/selected/cds.clean.faa"
+
+  _pdir = Pdir.gsub(%r{/prodigal/}, "/prodigal10k/") ## prodigal result for le10kb contigs
+  odir  = "#{_pdir}/selected"; mkdir_p odir unless File.directory?(odir)
+  fogff = "#{odir}/cds.gff"
+  fofaa = "#{odir}/cds.clean.faa"
+
+  ### parse contig info
+  ctg2len = {}
+  IO.readlines(Fctg)[2..-1].each{ |l|
+    # contig  length  gc      gc_skew A       T       G       C       N
+    ctg, len = l.chomp.split("\t").values_at(0, 1)
+    ctg2len[ctg] = len.to_i
+  }
+
+  ### parse gff
+  flag = 0
+  open(fogff, "w"){ |fw|
+    IO.readlines(figff).each{ |l|
+      if l =~ /^##gff/ ## header
+        fw.puts l
+      elsif l =~ /^# / and l =~ /seqhdr="([^"\s]+)/ ## parse name
+        ctg = $1
+        if ctg2len[ctg] <= 10000 ### <=10kb
+          flag = 1
+          fw.puts l
+        else
+          flag = 0
+        end
+      else 
+        fw.puts l if flag == 1
+      end
+    }
+  }
+
+  ### parse faa
+  open(fofaa, "w"){ |fw|
+    IO.read(fifaa).split(/^>/)[1..-1].each{ |ent|
+      ctg = ent.split("\n")[0].split(/\s+/)[0].split("_")[0..-2]*"_" ## <ctg>_1, <ctg>_2 --> <ctg>
+      if ctg2len[ctg] <= 10000 ### <=10kb
+        fw.puts ">#{ent}"
+      end
+    }
+  }
+end
 
 info = [] ## tot_len, table4_coding, table11_coding, %table4_coding, %table11_coding
 out  = []
 
 ### [0] total genome size
-size = IO.readlines(fctg)[1].split("\t")[1] ## bin length
+size = IO.readlines(Fctg)[1].split("\t")[1] ## bin length
 info << size.to_i
 out << "genome length: #{size}"
 
@@ -50,17 +96,23 @@ out << "%table11 coding density: #{info[4]}"
 ## use table 11 unless the coding density using table 4 is 5% higher than when using table 11 and the coding density under table 4 is >70%.
 if info[3] > 70 and info[3] - info[4] >= 5
   info[5] = "4"
-  sh "(cd #{pdir} ;  ln -s table4 selected)" 
-  sh "(cd #{_pdir} ; ln -s table4 selected)" 
   out << "selected codon table: 4"
+  sh "(cd #{Pdir} ;  ln -s table4 selected)" unless File.directory?("#{Pdir}/selected")
+
+  ### make prodigal10k
+  # sh "(cd #{_pdir} ; ln -s table4 selected)" 
+  make_prodigal10k("4")
 else
   info[5] = "11"
-  sh "(cd #{pdir} ;  ln -s table11 selected)" 
-  sh "(cd #{_pdir} ; ln -s table11 selected)" 
   out << "selected codon table: 11"
+  sh "(cd #{Pdir} ;  ln -s table11 selected)" unless File.directory?("#{Pdir}/selected")
+
+  # sh "(cd #{_pdir} ; ln -s table11 selected)" 
 end
 
-open(fout, "w"){ |fw|
-  fw.puts out
-}
+### make prodigal10k
+make_prodigal10k()
+
+### make stats.txt
+open(fout, "w"){ |fw| fw.puts out }
 

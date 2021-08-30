@@ -180,6 +180,7 @@ terL_gene  terL_aa_len  terL_besthit  terL_best_prob
 all_categories_pass_threshold  selected_categories  is_contamination
 |
 ctg2info = {}
+virS2ctg = {} ### virsorter contig (PACC02000035_1 --> PACC02000035.1)
 ctg2contam = Hash.new{ |h, i| h[i] = [] }
 posi = 0
 
@@ -193,6 +194,8 @@ size = 4
     ctg, len, gc, skew, ns = l.chomp.split("\t").values_at(0..3, 8)
     ns = "%.6g" % (100.0 * ns.to_i / len.to_i)
     ctg2info[ctg] = [len, gc, skew, ns]
+    virS = ctg.gsub(".", "_")
+    virS2ctg[virS] = ctg
   }
 }
 posi += size
@@ -387,7 +390,18 @@ size  = 5
              when /^VIRSorter_(\S+)_gene_\d+_gene_\d+-(\d+)-(\d+)-cat_\d/ then "#{$2.to_i+1}-#{$3}" ## provirus (could be category 4-6)
              else "1-#{vlen}" ## virus (could be category 1-3)
              end
-        # p [ctg, l]
+
+        ### [!!!] virsorter contigname workaround
+        ### e.g.) PACC02000035_1 --> PACC02000035.1
+        ### currently, only the modification ("." -> "_") is rescued. Other conversion is missing if exists.
+        unless ctg2info[ctg]
+          ctg = virS2ctg[ctg]
+          unless ctg2info[ctg]
+            p [ctg, l]
+            raise("#{ctg}: not valid contig name.")
+          end
+        end
+
         unless ctg2info[ctg][posi] 
           ctg2info[ctg][posi]   = category
           ctg2info[ctg][posi+1] = vlen
@@ -407,6 +421,13 @@ size  = 5
       ## VIRSorter_ERS477931_N0000002-circular   188442
       lab, len = l.split(/\s+/)
       ctg = lab[/^VIRSorter_(\S+)-circular$/, 1]
+      unless ctg2info[ctg]
+        ctg = virS2ctg[ctg]
+        unless ctg2info[ctg]
+          p [ctg, l]
+          raise("#{ctg}: not valid contig name.")
+        end
+      end
       ctg2info[ctg][posi+3] = len ## contig length (without terminal redundancy)
     }
   }

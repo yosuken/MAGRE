@@ -106,7 +106,7 @@ For details of each category, see the publication (Nishimura and Yoshizawa, bioR
 
 ## usage 
 ```
-### MAGRE ver 0.1.1 (2021-08-19) ###
+### MAGRE ver 0.1.2 (2021-08-30) ###
 
 [description]
 MAGRE is a tool for MAG quality refinement, by automatic removal of contigs that are likely 'contamination' of a given MAG.
@@ -179,5 +179,7 @@ $ MAGRE [options] -q <genome fasta file(s)> -c <configuration file> -o <output d
 
 ## citation
 ```
-Yosuke Nishimura and Susumu Yoshizawa. The OceanDNA MAG catalog contains over 50,000 prokaryotic genomes originated from various marine environments. bioRxiv, 2021
+Yosuke Nishimura and Susumu Yoshizawa.
+The OceanDNA MAG catalog contains over 50,000 prokaryotic genomes originated from various marine environments.
+bioRxiv, 2021. doi:10.1101/2021.08.18.456858
 ```

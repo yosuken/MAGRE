@@ -244,36 +244,55 @@ task "01-1a.validate_input", ["step"] do |t, args|
     ### make copy of input fasta
     path    = "#{Idir}/#{name}.fa"
     path3k  = "#{Idir3k}/#{name}.fa"  ### >=3kb
-    path10k = "#{Idir10k}/#{name}.fa" ### <10kb
+    path10k = "#{Idir10k}/#{name}.fa" ### <=10kb
 
-    ### make copy of input fasta
-    sh "cp #{File.absolute_path(fin)} #{path}" unless File.exist?(path)
+    ### make copy of input fasta and extract ge3kb contigs (for virsorter)
+    mkdir_p Idir3k unless File.directory?(Idir3k)
 
-    ### extract ge3kb contigs
-    unless File.exist?(path3k)
-      mkdir_p Idir3k unless File.directory?(Idir3k)
+    open(path, "w"){ |fw|
       open(path3k, "w"){ |fw3k|
-        IO.read(path).split(/^>/)[1..-1].each{ |ent|
-          lab, *seq = ent.split("\n")
-          len = seq.join("").gsub(/\s+/, "").size
-          fw3k.puts ">#{ent}"  if len >= 3000
+        open(File.absolute_path(fin)){ |fr|
+          lab, seq = "", ""
+          while l = fr.gets
+            if l =~ /^>(\S+)/
+              if lab != ""
+                seq = seq.gsub(/\s+/, "")
+                len = seq.size
+                fw.puts ">#{lab}\n#{seq}"
+                fw3k.puts ">#{lab}\n#{seq}" if len >= 3000 ### >=3kb
+              end
+
+              seq = ""
+              lab = l[/^>(\S+)/, 1]
+            else
+              seq += l.gsub(/\s+/, "")
+            end
+          end
+          ### last entry
+          if lab != ""
+            seq = seq.gsub(/\s+/, "")
+            len = seq.size
+            fw.puts ">#{lab}\n#{seq}"
+            fw3k.puts ">#{lab}\n#{seq}" if len >= 3000 ### >=3kb
+          end
         }
       }
-    end
+    }
 
-    ### extract lt10kb contigs
-    unless File.exist?(path10k)
-      mkdir_p Idir10k unless File.directory?(Idir10k)
-      open(path10k, "w"){ |fw10k|
-        IO.read(path).split(/^>/)[1..-1].each{ |ent|
-          lab, *seq = ent.split("\n")
-          len = seq.join("").gsub(/\s+/, "").size
-          fw10k.puts ">#{ent}" if len < 10000
+    ### store bp of each fasta (If bp < 20,000, prodigal should use '-p meta'. Otherwise, run railed.)
+    bp_path, bp_path3k = 0, 0
+    [path, path3k].zip([bp_path, bp_path3k]){ |pa, bp|
+      if File.exist?(pa)
+        open(pa){ |fr|
+          while l = fr.gets
+            next if l.strip =~ /^>/
+            bp += l.strip.size
+          end
         }
-      }
-    end
+      end
+    }
 
-    h = { idx: idx, name: name, path: path, path3k: path3k, path10k: path10k, original: File.absolute_path(fin), checkm_idx: (idx - 1) / ChunkCheckm + 1 }
+    h = { idx: idx, name: name, bp_path: bp_path, bp_path3k: bp_path3k, path: path, path3k: path3k, original: File.absolute_path(fin), checkm_idx: (idx - 1) / ChunkCheckm + 1 }
     $stderr.puts h.inspect
 
     a << h ### [!] this line must be at the end.
@@ -410,14 +429,21 @@ task "01-3a.prodigal", ["step"] do |t, args|
       log  = "prodigal.log"
       faa2 = "cds.clean.faa"
 
-      %w|prodigal prodigal10k|.zip([fin[:path], fin[:path10k]]){ |type, _fin|
-        odir    = "#{Tdir}/#{type}/#{fin[:name]}/table#{codon}"; mkdir_p odir unless File.directory?(odir)
+      ### [2021-08-27 changed] prodigal10k is built from prodigal
+      %w|prodigal|.zip([fin[:path]], [fin[:bp_path]]){ |type, _fin, _bp|
+        odir = "#{Tdir}/#{type}/#{fin[:name]}/table#{codon}"; mkdir_p odir unless File.directory?(odir)
         if File.zero?(_fin)
           sh "(cd #{odir} ; touch #{gff} #{faa} #{fna} #{faa2} ; echo 'Input fasta is empty. Empty output files are created.')"; next
         end
         next if File.exist?("#{odir}/#{faa2}")
 
-        outs << "(cd #{odir} ; prodigal -p single -g #{codon} -i #{File.absolute_path(_fin)} -f gff -o #{gff} -a #{faa} -d #{fna} >#{log} 2>&1 && #{cleaner} #{faa} >#{faa2})" 
+        if _bp < 20000 ## workaround for "Error:  Sequence must be 20000 characters (only 5824 read)."
+          cmd = "prodigal -p meta   -g #{codon} -i #{File.absolute_path(_fin)} -f gff -o #{gff} -a #{faa} -d #{fna} >#{log} 2>&1"
+        else
+          cmd = "prodigal -p single -g #{codon} -i #{File.absolute_path(_fin)} -f gff -o #{gff} -a #{faa} -d #{fna} >#{log} 2>&1"
+        end
+
+        outs << "(cd #{odir} ; #{cmd} && #{cleaner} #{faa} >#{faa2})" 
       }
     }
   }
@@ -493,7 +519,7 @@ task "01-4.other_tasks", ["step"] do |t, args|
       next if File.exist?("#{odir}/BAT.out.bin2classification.txt") and File.exist?("#{odir}/CAT.out.contig2classification.txt") ## ran?
 
       cmds  = []
-      cmds << "CAT bin     -n #{Ncat} --tmpdir #{tdir} -b #{fin[:path]} -d #{CatNrDb} -t #{CatTxDb} -p #{fin[:faa]} -o #{odir}/BAT.out >/dev/null" ## log file: BAT.out.log
+      cmds << "CAT bin --force -n #{Ncat} --tmpdir #{tdir} -b #{fin[:path]} -d #{CatNrDb} -t #{CatTxDb} -p #{fin[:faa]} -o #{odir}/BAT.out >/dev/null" ## log file: BAT.out.log
       cmds << "CAT contigs -n #{Ncat} --tmpdir #{tdir} -c #{fin[:path]} -d #{CatNrDb} -t #{CatTxDb} -p #{fin[:faa]} -a #{odir}/BAT.out.alignment.diamond -o #{odir}/CAT.out >/dev/null" ## log file: CAT.out.log
       outs << cmds.join(" && ").gsub(/\s+/, " ")
     }
