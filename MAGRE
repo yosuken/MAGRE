@@ -27,6 +27,7 @@ More functions (e.g., choose thresholds for each category) are planned to develo
 3. mobile element filter (viral contigs detected by virsorter or high sensitive terL gene identification, and circular contigs)
    categories for this filter are 'virsorter', 'terL', and 'circular'
 
+
 [1;32m[categories][0m
 See the original publication for datails.
 1.   taxonomy  - remove taxonomically inconsistent contigs based on CAT/BAT result.
@@ -50,6 +51,7 @@ $ $PROGNAME [options] -q <genome fasta file(s)> -c <configuration file> -o <outp
     -c, --config     [file] (required)     -- configuration file (two columns of space separated values; template: db_config.txt) 
     -o, --outdir     [path] (required)     -- output directory (should not exist unless '--overwrite' is specified)
     --fcov           [file]                -- coverage of contigs (the format must be either 'TSV with a header line' or 'output of jgi_summarize_bam_contig_depths') 
+		--minlen         [int] (default: 0)    -- the minimum contig length (bp) to retain.
     --category       [str] (default:all)   -- selction of categories to remove contigs
                                               It must be combination of 'taxonomy', 'coverage', 'tetranuc', 'virsorter', 'terL', 'circular'
                                               e.g: 'taxonomy,coverage' will remove taxonomically inconsistent contigs and coverage outlier contigs.
@@ -106,6 +108,13 @@ do
 			category="$2"
 			shift 2
 			;;
+		'--minlen' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
+				echo "$Errmsg option requires an argument -- $1" 1>&2; exit 1
+			fi
+			minlen="$2"
+			shift 2
+			;;
 		'-o'|'--outdir' )
 			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]] ; then
 				echo "$Errmsg option requires an argument -- $1" 1>&2; exit 1
@@ -142,6 +151,7 @@ done
 
 ## default
 ncpus="${ncpus:-4}"
+minlen="${minlen:-0}"
 category="${category:-all}"
 
 re='^[0-9]+$'
@@ -239,6 +249,7 @@ trap 'after_run 1' 1 2 3 9 15
 rake -f $rakefile \
 	outdir="$outdir" input="$input" config="$config" outdir_exist="$outdir_exist" \
 	fcov="$fcov" \
+	minlen="$minlen" \
 	category="$category" \
 	ncpus="$ncpus" \
 	2>&1 |tee -a $flog

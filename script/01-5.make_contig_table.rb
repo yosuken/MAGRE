@@ -1,12 +1,14 @@
 
-category, Tdir, bin, ftax, fout, *excess = ARGV 
+category, minlen, Tdir, bin, ftax, fout, *excess = ARGV 
 raise("argument is not enough") unless fout
 raise("argument is too much") if excess.size > 0
 
 ### parse category
 cats = %w|taxonomy coverage tetranuc virsorter terL circular|
 category = category.gsub(/\s+/, "").gsub("'", "").split(",")
-Category = category == ["all"] ? cats : category
+category = category == ["all"] ? cats : category
+Category = category + ["length"] ### add length filter
+MinLen   = minlen.to_i
 
 
 # {{{ setting and documentation
@@ -196,6 +198,8 @@ size = 4
     ctg2info[ctg] = [len, gc, skew, ns]
     virS = ctg.gsub(".", "_")
     virS2ctg[virS] = ctg
+
+    ctg2contam[ctg] << "length:#{len}" if len.to_i < MinLen
   }
 }
 posi += size
@@ -485,6 +489,7 @@ fill_blank(ctg2info, posi)
 
 # {{{ contamination (n=3)
 size  = 3
+p Category
 ctg2contam.each{ |ctg, contam|
   if contam.size > 0
     _contam = [] ## selected contam

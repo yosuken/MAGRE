@@ -127,6 +127,7 @@ task :default do
   Ncpu      = ENV["ncpus"].to_i       ## num of CPUs
   Fcov      = ENV["fcov"]             ## file of coverage
   Category  = ENV["category"]         ## category of remove (combination of 'taxonomy', 'coverage', 'tetranuc', 'virsorter', 'terL', 'circular')
+  MinLen    = ENV["minlen"]           ## minimum contig length (in bp) to retain
 
 	### constants
   Errmsg      = "\e[1;31mError:\e[0m"
@@ -568,7 +569,7 @@ task "01-5.make_contig_table", ["step"] do |t, args|
     fout = "#{odir}/contig_table.tsv"
     flog = "#{odir}/contig_table.log"
     ftax = "#{CatTxDb}/MAGRE/parsed2.txt"
-    outs << "ruby #{script} '#{Category}' #{Tdir} #{fin[:name]} #{ftax} #{fout} >#{flog} 2>&1"
+    outs << "ruby #{script} '#{Category}' #{MinLen} #{Tdir} #{fin[:name]} #{ftax} #{fout} >#{flog} 2>&1"
   }
 
 	WriteBatch.call(t, Jobdir, outs)

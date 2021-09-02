@@ -23,7 +23,7 @@ fin2  = "#{idir}/nodes.dmp"
 (puts usage; exit) unless File.exist?(fin1)
 (puts usage; exit) unless File.exist?(fin2)
 
-odir  = "#{idir}/mag_refine"; mkdir_p odir unless File.directory?(odir)
+odir  = "#{idir}/MAGRE"; mkdir_p odir unless File.directory?(odir)
 fout  = open("#{odir}/parsed2.txt", "w")
 ranks = {} # ranks["family"]["31"] = 1
 
